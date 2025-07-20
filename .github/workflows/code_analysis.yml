@@ -14,6 +14,8 @@ on:
 # Give the default GITHUB_TOKEN write permission to commit and push changes
 permissions:
   contents: write
+  pull-requests: write
+  statuses: write
 
 jobs:
   analyze:
@@ -23,6 +25,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Needed to get git history for proper diffing
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -49,31 +53,38 @@ jobs:
         PYTHONPATH: ${{ github.workspace }}
 
     - name: Run code analysis and generate documentation
+      id: analysis
       run: |
+        # Create docs directory if it doesn't exist
+        mkdir -p docs
+        
+        # Run the analysis
         python -m src.action
         
-        # Only proceed if we're on the main branch
-        if [ "${{ github.ref_name }}" = "main" ]; then
-          # Configure Git with token for authentication
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-          
-          # Add and commit changes
-          git config --global user.name 'GitHub Action'
-          git config --global user.email 'action@github.com'
-          
-          # Create docs directory if it doesn't exist
-          mkdir -p docs
-          
-          # Add and commit any new documentation files
-          git add docs/*.docx 2>/dev/null || echo "No docx files to add"
-          
-          # Check if there are changes to commit
-          if ! git diff --quiet && ! git diff --staged --quiet; then
-            git commit -m "docs: Update generated documentation [skip ci]"
-            git push
-          else
-            echo "No documentation changes to commit"
-          fi
+        # Check if any documentation was generated
+        if [ -n "$(find docs -name '*.docx' -type f -print -quit)" ]; then
+          echo "documentation_generated=true" >> $GITHUB_OUTPUT
         else
-          echo "Not on main branch, skipping documentation update"
+          echo "documentation_generated=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Commit and push documentation
+      if: steps.analysis.outputs.documentation_generated == 'true' && github.ref == 'refs/heads/main'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Configure git
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        
+        # Stage only the docx files
+        git add docs/*.docx
+        
+        # Check if there are changes to commit
+        if ! git diff --cached --quiet; then
+          git commit -m "docs: Update generated documentation [skip ci]"
+          git push
+          echo "Documentation updated and pushed successfully"
+        else
+          echo "No documentation changes to commit"
         fi

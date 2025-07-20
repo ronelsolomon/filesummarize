@@ -2,9 +2,11 @@ import os
 import sys
 from pathlib import Path
 from typing import List, Dict, Any
+from datetime import datetime
 from ollama import Client
 
 from .analyzer import extract_elements
+from .code_explainer.document_generator import create_document
 
 def analyze_repository() -> None:
     """Main function to analyze the repository."""
@@ -31,8 +33,9 @@ def analyze_repository() -> None:
         print("No code elements found to analyze.")
         return
     
-    # Generate explanation
-    client = Client(host=ollama_host)
+    # Create docs directory if it doesn't exist
+    docs_dir = Path('docs')
+    docs_dir.mkdir(exist_ok=True)
     
     # Format elements for the prompt
     combined = "\n\n".join(
@@ -46,7 +49,9 @@ def analyze_repository() -> None:
         for el in all_elements
     )
     
-    system_prompt = f"""You are a helpful assistant. Your job is to explain the Python code and workflow described below 
+    # Generate explanation
+    client = Client(host=ollama_host)
+    system_prompt = """You are a helpful assistant. Your job is to explain the Python code and workflow described below 
 in plain, non-technical English to someone without a programming background. Avoid technical jargon. 
 Use relatable analogies and simple examples where appropriate.
 
@@ -58,12 +63,26 @@ Use relatable analogies and simple examples where appropriate.
             messages=[{"role": "user", "content": system_prompt}],
             stream=False
         )
+        explanation = response['message']['content']
         print("\n" + "="*80)
         print("CODE ANALYSIS REPORT")
         print("="*80)
-        print(response['message']['content'])
+        print(explanation)
+        
+        # Generate and save the document
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        doc_path = docs_dir / f"code_analysis_{timestamp}.docx"
+        
+        doc_buffer = create_document(all_elements, explanation, "Python Code Analysis Report")
+        if doc_buffer:
+            with open(doc_path, 'wb') as f:
+                f.write(doc_buffer.getvalue())
+            print(f"\nDocument generated: {doc_path}")
+        else:
+            print("\nWarning: Could not generate Word document. Make sure python-docx is installed.")
+            
     except Exception as e:
-        print(f"Error generating explanation: {e}", file=sys.stderr)
+        print(f"Error during analysis: {e}", file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -119,39 +119,42 @@ python -m src.code_explainer.cli document path/to/your/file.py --output docs/
 └── setup.py               # Package configuration
 ```
 
-## 🤖 GitHub Action
+## GitHub Actions
 
-This repository includes a GitHub Action that automatically generates documentation on push:
+This project includes a GitHub Actions workflow (`.github/workflows/code_analysis.yml`) that:
 
-1. Triggered on pushes to `main` branch
-2. Analyzes changed Python files
-3. Generates and commits documentation updates
+1. Runs tests on push and pull requests
+2. Performs code analysis using the Python Code Explainer
+3. Generates documentation in Word format
+4. Automatically commits and pushes generated documentation to the repository
+
+### Workflow Triggers
+
+- **Push to main branch**: Runs tests, performs analysis, and updates documentation
+- **Pull requests**: Runs tests and performs analysis (does not update documentation)
+- **Manual trigger**: Can be manually triggered from the Actions tab
+
+### Generated Documentation
+
+When the workflow runs on the main branch, it will:
+
+1. Generate a Word document (`docs/code_analysis_YYYYMMDD_HHMMSS.docx`)
+2. Include a summary of all analyzed code elements
+3. Provide detailed explanations of the code structure
+4. Automatically commit and push the generated documentation
+
+### Required Permissions
+
+The workflow requires the following permissions:
+- `contents: write` - To commit and push generated documentation
+- `pull-requests: write` - To update pull request statuses
+- `statuses: write` - To update commit statuses
+
+These permissions are automatically provided by the default `GITHUB_TOKEN`. No additional configuration is needed for public repositories. For private repositories, ensure the workflow has the necessary permissions in your repository settings.
 
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-   - Saves the output as a Word document in the `docs` directory
-
-3. **Artifact Storage**: The generated documentation is available as a downloadable artifact in the GitHub Actions run.
-
-4. **Auto-commit**: The workflow will automatically commit and push the updated documentation back to the repository.
-
-### Viewing Documentation
-
-1. Go to the "Actions" tab in your GitHub repository
-2. Click on the latest workflow run
-3. Download the "code-documentation" artifact to get the Word document
-
-### Manual Trigger
-
-You can also manually trigger the documentation generation:
-1. Go to the "Actions" tab
-2. Select "Generate Documentation" workflow
-3. Click "Run workflow"
 
 ## 🤝 Contributing
 

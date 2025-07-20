@@ -1,0 +1,57 @@
+name: 'Python Code Analyzer'
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**/*.py'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**/*.py'
+  workflow_dispatch:
+
+description: 'Analyze Python code and generate documentation'
+author: 'Ronel'
+branding:
+  icon: 'code'
+  color: 'blue'
+
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.10'
+  ollama-model:
+    description: 'Ollama model to use for analysis'
+    required: false
+    default: 'llama2'
+  ollama-host:
+    description: 'Ollama server host'
+    required: false
+    default: 'http://localhost:11434'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run analysis
+      shell: bash
+      run: python -m src.action
+      env:
+        OLLAMA_MODEL: ${{ inputs.ollama-model }}
+        OLLAMA_HOST: ${{ inputs.ollama-host }}
+        GITHUB_TOKEN: ${{ github.token }}

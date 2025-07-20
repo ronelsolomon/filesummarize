@@ -28,6 +28,17 @@ def create_document(code_elements: List[Dict[str, Any]], explanation: str,
     if not DOCX_AVAILABLE:
         return None
         
+    def _get_or_create_code_style(doc):
+        """Get the Code style or create it if it doesn't exist."""
+        try:
+            return doc.styles['Code']
+        except KeyError:
+            code_style = doc.styles.add_style('Code', 1)  # 1 = WD_STYLE_TYPE.PARAGRAPH
+            code_style.font.name = 'Courier New'
+            code_style.font.size = Pt(10)
+            code_style.paragraph_format.space_after = Pt(6)
+            return code_style
+        
     try:
         doc = Document()
         
@@ -36,6 +47,9 @@ def create_document(code_elements: List[Dict[str, Any]], explanation: str,
         title_run = title_para.add_run(title)
         title_run.bold = True
         title_para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        
+        # Ensure we have the Code style
+        _get_or_create_code_style(doc)
         
         # Add summary section
         doc.add_heading("Summary", level=1)
