@@ -29,6 +29,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install pytest pytest-cov
 
     - name: Start Ollama service
       run: |
@@ -36,6 +37,12 @@ jobs:
         ollama serve &
         sleep 10  # Give Ollama some time to start
         ollama pull llama2
+
+    - name: Run tests
+      run: |
+        python -m pytest tests/ -v --cov=src --cov-report=xml
+      env:
+        PYTHONPATH: ${{ github.workspace }}
 
     - name: Run code analysis
       run: python -m src.action
