@@ -86,10 +86,6 @@ def main(args: Optional[list] = None) -> int:
         if not all_code_elements:
             print("No code elements found in any files.")
             return 0
-        
-        if not code_elements:
-            print("No functions or classes found in the file.")
-            return 0
             
         # Generate explanation
         print("\nAnalyzing code...", file=sys.stderr)
