@@ -88,9 +88,50 @@ A Streamlit-based web application that analyzes Python code and generates non-te
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## 🤖 Automated Documentation with GitHub Actions
+
+This repository includes a GitHub Actions workflow that automatically generates documentation whenever you push code changes. Here's how it works:
+
+1. **Automatic Trigger**: The workflow runs on every push to the `main` branch that includes changes to Python files.
+
+2. **Documentation Generation**:
+   - The workflow checks out your code
+   - Sets up Python and installs dependencies
+   - Runs the documentation generator on all Python files
+   - Saves the output as a Word document in the `docs` directory
+
+3. **Artifact Storage**: The generated documentation is available as a downloadable artifact in the GitHub Actions run.
+
+4. **Auto-commit**: The workflow will automatically commit and push the updated documentation back to the repository.
+
+### Viewing Documentation
+
+1. Go to the "Actions" tab in your GitHub repository
+2. Click on the latest workflow run
+3. Download the "code-documentation" artifact to get the Word document
+
+### Manual Trigger
+
+You can also manually trigger the documentation generation:
+1. Go to the "Actions" tab
+2. Select "Generate Documentation" workflow
+3. Click "Run workflow"
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Development Setup
+
+1. Fork and clone the repository
+2. Set up a virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -e .[dev]
+   ```
+3. Make your changes and run tests
+4. Submit a pull request
 
 ## 📧 Contact
 
