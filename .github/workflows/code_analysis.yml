@@ -11,6 +11,10 @@ on:
       - '**/*.py'
   workflow_dispatch:
 
+# Give the default GITHUB_TOKEN write permission to commit and push changes
+permissions:
+  contents: write
+
 jobs:
   analyze:
     name: Analyze Python Code
@@ -44,8 +48,32 @@ jobs:
       env:
         PYTHONPATH: ${{ github.workspace }}
 
-    - name: Run code analysis
-      run: python -m src.action
-      env:
-        OLLAMA_MODEL: llama2
-        OLLAMA_HOST: http://localhost:11434
+    - name: Run code analysis and generate documentation
+      run: |
+        python -m src.action
+        
+        # Only proceed if we're on the main branch
+        if [ "${{ github.ref_name }}" = "main" ]; then
+          # Configure Git with token for authentication
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          
+          # Add and commit changes
+          git config --global user.name 'GitHub Action'
+          git config --global user.email 'action@github.com'
+          
+          # Create docs directory if it doesn't exist
+          mkdir -p docs
+          
+          # Add and commit any new documentation files
+          git add docs/*.docx 2>/dev/null || echo "No docx files to add"
+          
+          # Check if there are changes to commit
+          if ! git diff --quiet && ! git diff --staged --quiet; then
+            git commit -m "docs: Update generated documentation [skip ci]"
+            git push
+          else
+            echo "No documentation changes to commit"
+          fi
+        else
+          echo "Not on main branch, skipping documentation update"
+        fi
