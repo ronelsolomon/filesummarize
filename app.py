@@ -18,12 +18,23 @@ def main():
     # Sidebar for settings
     with st.sidebar:
         st.header("Settings")
+        
+        # Model selection
         model_name = st.selectbox(
             "LLM Model",
             ["llama2", "llama3", "mistral"],
             index=0,
             help="Select the language model to use for generating explanations"
         )
+        
+        # Ollama host configuration
+        with st.expander("Advanced Settings"):
+            ollama_host = st.text_input(
+                "Ollama Server URL",
+                value=st.session_state.get('ollama_host', 'http://localhost:11434'),
+                help="URL of the Ollama server (default: http://localhost:11434)"
+            )
+            st.session_state.ollama_host = ollama_host
     
     # File uploader
     uploaded_file = st.file_uploader("Upload Python (.py) file", type="py")
@@ -61,7 +72,12 @@ def main():
                         st.write(explanation)
                         
                         # Generate and offer download of DOCX report
-                        doc_buffer = create_document(code_elements, explanation)
+                        doc_buffer = create_document(
+                            code_elements, 
+                            explanation,
+                            model=model_name,
+                            host=st.session_state.get('ollama_host', 'http://localhost:11434')
+                        )
                         if doc_buffer:
                             st.download_button(
                                 label="📥 Download Analysis Report",

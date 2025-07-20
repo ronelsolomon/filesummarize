@@ -1,8 +1,151 @@
 """
 Document generation module for creating Word documents from code analysis.
 """
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from io import BytesIO
+from dataclasses import dataclass
+import json
+from ollama import Client
+
+@dataclass
+class CodeElementSummary:
+    """Class to hold simplified information about a code element."""
+    name: str
+    type: str
+    description: str
+    example: str = ""
+
+def generate_non_tech_explanation(code_elements: List[Dict[str, Any]], 
+                               model: str = 'llama2',
+                               host: str = 'http://localhost:11434') -> Tuple[str, List[CodeElementSummary]]:
+    """
+    Generate a non-technical explanation of the code using LLM.
+    
+    Args:
+        code_elements: List of code element dictionaries from the analyzer
+        model: The Ollama model to use for generation
+        host: The Ollama server host
+        
+    Returns:
+        Tuple of (general_explanation, element_descriptions)
+    """
+    try:
+        client = Client(host=host)
+        
+        # Create a simplified version of code elements for the prompt
+        simplified_elements = []
+        for el in code_elements:
+            simplified = {
+                'name': el.get('name', 'unnamed'),
+                'type': el.get('type', 'code'),
+                'docstring': el.get('docstring', ''),
+                'args': el.get('args', []),
+                'has_return': el.get('has_return', False),
+                'source': el.get('source', '')[:500]  # Limit source length
+            }
+            simplified_elements.append(simplified)
+        
+        # Prepare the prompt
+        system_prompt = """You are a helpful assistant that explains code in simple, non-technical terms. 
+        Your audience has little to no programming knowledge. Use analogies and simple language.
+        Explain what the code does, not how it does it."""
+        
+        user_prompt = f"""Please explain the following Python code elements in a way that's easy for non-programmers to understand.
+        For each element, provide:
+        1. A simple explanation of what it does
+        2. A real-world analogy
+        3. A simple example of how it might be used
+        
+        Code elements to explain: {json.dumps(simplified_elements, indent=2)}
+        
+        Format your response as a JSON object with these fields:
+        - general_overview: A brief overview of what the code does as a whole
+        - elements: A list of objects, each with 'name', 'type', 'explanation', 'analogy', and 'example' fields
+        """
+        
+        # Get the LLM response
+        response = client.chat(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            format="json"
+        )
+        
+        # Parse the response
+        try:
+            result = json.loads(response['message']['content'])
+            
+            # Format the general explanation
+            general = f"# Understanding the Code: A Friendly Guide\n\n"
+            general += f"## What This Code Does\n\n{result.get('general_overview', 'This code performs specific operations.')}\n\n"
+            
+            # Format the elements
+            elements = []
+            for elem in result.get('elements', []):
+                desc = f"{elem.get('explanation', '')}\n\n"
+                if 'analogy' in elem:
+                    desc += f"*Think of it like:* {elem['analogy']}\n\n"
+                elements.append(CodeElementSummary(
+                    name=elem.get('name', 'unnamed'),
+                    type=elem.get('type', 'code').capitalize(),
+                    description=desc.strip(),
+                    example=elem.get('example', '')
+                ))
+                
+                # Add to general explanation
+                general += f"### {elem.get('type', 'Element').capitalize()}: {elem.get('name', 'Unnamed')}\n"
+                general += f"{desc}\n"
+                if 'example' in elem:
+                    general += f"*Example:* {elem['example']}\n\n"
+            
+            # Add conclusion
+            general += """
+## Why This Is Helpful
+
+1. **For Beginners**: Understand code without needing to learn programming first
+2. **For Teams**: Helps non-technical team members understand technical work
+3. **For Documentation**: Creates clear, accessible records of what code does
+
+## Real-World Impact
+
+This kind of code documentation helps bridge the gap between technical and non-technical stakeholders, making technology more accessible to everyone.
+"""
+            
+            return general, elements
+            
+        except json.JSONDecodeError:
+            # Fallback to simple explanation if JSON parsing fails
+            return _generate_fallback_explanation(code_elements)
+            
+    except Exception as e:
+        print(f"Error generating LLM explanation: {e}")
+        return _generate_fallback_explanation(code_elements)
+
+def _generate_fallback_explanation(code_elements: List[Dict[str, Any]]) -> Tuple[str, List[CodeElementSummary]]:
+    """Generate a simple fallback explanation without LLM."""
+    elements = []
+    general = "# Code Explanation\n\nThis code contains the following components:\n\n"
+    
+    for el in code_elements:
+        el_type = el.get('type', 'code')
+        name = el.get('name', 'unnamed')
+        desc = f"{el_type.capitalize()} '{name}'"
+        if el.get('docstring'):
+            desc += f": {el['docstring']}"
+            
+        elements.append(CodeElementSummary(
+            name=name,
+            type=el_type,
+            description=desc,
+            example=""
+        ))
+        
+        general += f"- {desc}\n"
+    
+    general += "\nFor a more detailed explanation, please check the technical documentation."
+    return general, elements
 
 try:
     from docx import Document
@@ -13,7 +156,10 @@ except ImportError:
     DOCX_AVAILABLE = False
 
 def create_document(code_elements: List[Dict[str, Any]], explanation: str, 
-                   title: str = "Python Code Analysis") -> Optional[BytesIO]:
+                   title: str = "Python Code Analysis",
+                   include_non_tech: bool = True,
+                   model: str = 'llama2',
+                   host: str = 'http://localhost:11434') -> Optional[BytesIO]:
     """
     Create a Word document from code analysis and explanation.
     
@@ -21,12 +167,24 @@ def create_document(code_elements: List[Dict[str, Any]], explanation: str,
         code_elements: List of code element dictionaries, each can include 'file' key
         explanation: Generated explanation text
         title: Title for the document
+        include_non_tech: Whether to include non-technical explanation
+        model: The Ollama model to use for non-technical explanations
+        host: The Ollama server host
         
     Returns:
         BytesIO buffer containing the document, or None if docx is not available
     """
     if not DOCX_AVAILABLE:
         return None
+        
+    # Generate non-technical explanation if requested
+    non_tech_explanation = ""
+    if include_non_tech and code_elements:
+        non_tech_explanation, _ = generate_non_tech_explanation(
+            code_elements, 
+            model=model,
+            host=host
+        )
         
     def _get_or_create_code_style(doc):
         """Get the Code style or create it if it doesn't exist."""
@@ -51,8 +209,32 @@ def create_document(code_elements: List[Dict[str, Any]], explanation: str,
         # Ensure we have the Code style
         _get_or_create_code_style(doc)
         
-        # Add summary section
-        doc.add_heading("Summary", level=1)
+        # Add non-technical explanation section if available
+        if non_tech_explanation:
+            doc.add_heading("Non-Technical Overview", level=1)
+            # Split by lines to handle markdown-style headers
+            lines = non_tech_explanation.split('\n')
+            for line in lines:
+                if line.startswith('#'):
+                    # Handle headers
+                    level = line.count('#')
+                    text = line.lstrip('#').strip()
+                    doc.add_heading(text, level=min(level, 3))  # Cap at level 3
+                elif line.startswith(('**', '* ')):
+                    # Handle bullet points and bold text
+                    para = doc.add_paragraph()
+                    if line.startswith('* '):
+                        line = line[2:]
+                    run = para.add_run(line)
+                    if line.startswith('**') and line.endswith('**'):
+                        run.bold = True
+                elif line.strip():
+                    doc.add_paragraph(line)
+                
+            doc.add_page_break()
+            
+        # Add technical summary section
+        doc.add_heading("Technical Summary", level=1)
         
         # Count elements by type and file
         elements_by_file = {}
