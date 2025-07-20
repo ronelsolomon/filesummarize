@@ -147,6 +147,89 @@ def _generate_fallback_explanation(code_elements: List[Dict[str, Any]]) -> Tuple
     general += "\nFor a more detailed explanation, please check the technical documentation."
     return general, elements
 
+def generate_codebase_summary(code_elements: List[Dict[str, Any]], 
+                           model: str = 'llama2',
+                           host: str = 'http://localhost:11434') -> Dict[str, Any]:
+    """
+    Generate a comprehensive summary of the codebase using LLM.
+    
+    Args:
+        code_elements: List of code element dictionaries from the analyzer
+        model: The Ollama model to use for generation
+        host: The Ollama server host
+        
+    Returns:
+        Dictionary containing the summary with the following keys:
+        - overview: General overview of the codebase
+        - architecture: High-level architecture description
+        - key_components: List of main components
+        - data_flow: Description of how data moves through the system
+        - dependencies: External libraries and services used
+        - setup_instructions: How to set up the project
+        - usage_examples: Example usage of the main components
+    """
+    try:
+        client = Client(host=host)
+        
+        # Prepare the prompt
+        system_prompt = """You are a senior software architect analyzing a codebase. 
+        Provide a comprehensive summary in JSON format with the following structure:
+        {
+            "overview": "Brief overview of what the codebase does",
+            "architecture": "High-level architecture description",
+            "key_components": ["List", "of", "main", "components"],
+            "data_flow": "Description of how data moves through the system",
+            "dependencies": ["List", "of", "main", "dependencies"],
+            "setup_instructions": "Step-by-step setup instructions",
+            "usage_examples": "Example usage of the main components"
+        }"""
+        
+        # Create a simplified version of code elements for the prompt
+        simplified_elements = []
+        for el in code_elements:
+            simplified = {
+                'name': el.get('name', 'unnamed'),
+                'type': el.get('type', 'code'),
+                'docstring': el.get('docstring', ''),
+                'file': el.get('file', 'unknown')
+            }
+            simplified_elements.append(simplified)
+        
+        user_prompt = f"""Analyze the following code elements and provide a comprehensive summary:
+        {json.dumps(simplified_elements, indent=2)}
+        
+        Focus on:
+        1. The overall purpose of the codebase
+        2. How the different components interact
+        3. The main data flows
+        4. Key dependencies
+        5. How to set up and use the system
+        """
+        
+        # Get the LLM response
+        response = client.chat(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            format="json"
+        )
+        
+        # Parse and return the response
+        try:
+            return json.loads(response['message']['content'])
+        except json.JSONDecodeError:
+            return {
+                "error": "Failed to parse the LLM response",
+                "raw_response": response['message']['content']
+            }
+            
+    except Exception as e:
+        return {
+            "error": f"Error generating codebase summary: {str(e)}"
+        }
+
 try:
     from docx import Document
     from docx.shared import Pt
@@ -158,6 +241,7 @@ except ImportError:
 def create_document(code_elements: List[Dict[str, Any]], explanation: str, 
                    title: str = "Python Code Analysis",
                    include_non_tech: bool = True,
+                   include_summary: bool = True,
                    model: str = 'llama2',
                    host: str = 'http://localhost:11434') -> Optional[BytesIO]:
     """
@@ -168,6 +252,7 @@ def create_document(code_elements: List[Dict[str, Any]], explanation: str,
         explanation: Generated explanation text
         title: Title for the document
         include_non_tech: Whether to include non-technical explanation
+        include_summary: Whether to include a comprehensive codebase summary
         model: The Ollama model to use for non-technical explanations
         host: The Ollama server host
         
@@ -182,6 +267,15 @@ def create_document(code_elements: List[Dict[str, Any]], explanation: str,
     if include_non_tech and code_elements:
         non_tech_explanation, _ = generate_non_tech_explanation(
             code_elements, 
+            model=model,
+            host=host
+        )
+        
+    # Generate codebase summary if requested
+    codebase_summary = {}
+    if include_summary and code_elements:
+        codebase_summary = generate_codebase_summary(
+            code_elements,
             model=model,
             host=host
         )
@@ -209,27 +303,24 @@ def create_document(code_elements: List[Dict[str, Any]], explanation: str,
         # Ensure we have the Code style
         _get_or_create_code_style(doc)
         
-        # Add non-technical explanation section if available
+        # Add non-technical explanation if available
         if non_tech_explanation:
             doc.add_heading("Non-Technical Overview", level=1)
-            # Split by lines to handle markdown-style headers
             lines = non_tech_explanation.split('\n')
+            current_paragraph = None
+            
             for line in lines:
-                if line.startswith('#'):
-                    # Handle headers
-                    level = line.count('#')
-                    text = line.lstrip('#').strip()
-                    doc.add_heading(text, level=min(level, 3))  # Cap at level 3
-                elif line.startswith(('**', '* ')):
-                    # Handle bullet points and bold text
-                    para = doc.add_paragraph()
-                    if line.startswith('* '):
-                        line = line[2:]
-                    run = para.add_run(line)
-                    if line.startswith('**') and line.endswith('**'):
-                        run.bold = True
-                elif line.strip():
-                    doc.add_paragraph(line)
+                if line.startswith('## '):
+                    doc.add_heading(line[3:].strip(), level=2)
+                elif line.startswith('### '):
+                    doc.add_heading(line[4:].strip(), level=3)
+                elif line.startswith('#### '):
+                    doc.add_heading(line[5:].strip(), level=4)
+                elif line.strip() == '':
+                    if current_paragraph:
+                        current_paragraph.add_run('\n')
+                else:
+                    current_paragraph = doc.add_paragraph(line)
                 
             doc.add_page_break()
             
