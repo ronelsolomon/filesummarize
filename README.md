@@ -1,18 +1,19 @@
 # Python Code Explainer with Llama
 
-A Streamlit-based web application that analyzes Python code and generates non-technical explanations using the Llama language model. This tool is perfect for educators, documentation writers, and developers who want to understand or explain complex code in simple terms.
+A powerful tool that analyzes Python code and generates comprehensive documentation and explanations using the Llama language model. Available both as a Streamlit web application and a command-line interface.
 
 ![Python Code Explainer](https://img.shields.io/badge/python-3.8%2B-blue)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## ✨ Features
 
-- 🔍 Automatic extraction of functions and classes from Python code
+- 🔍 Automatic extraction of functions, classes, and methods from Python code
 - 📝 Detailed code analysis including arguments, return values, and docstrings
 - 🤖 AI-powered non-technical explanations using Llama model
-- 📊 Interactive web interface with expandable code sections
-- 📥 Export analysis as a well-formatted Word document
-- 🚀 Easy to use with just a few clicks
+- 🖥️ Multiple interfaces: Web UI and Command Line
+- 📥 Export analysis as well-formatted Word documents
+- 🔄 GitHub Action for automated documentation generation
+- 🧩 Modular architecture for easy extension
 
 ## 🚀 Quick Start
 
@@ -29,75 +30,110 @@ A Streamlit-based web application that analyzes Python code and generates non-te
    cd python-code-explainer
    ```
 
-2. Install the required packages:
+2. Install the package in development mode:
+   ```bash
+   pip install -e .
+   ```
+   
+   Or install the required packages directly:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Make sure you have Ollama installed and running:
+3. Set up Ollama:
    ```bash
    # Install Ollama (if not already installed)
    # Visit https://ollama.ai for installation instructions
    
-   # Start Ollama server
+   # Start Ollama server in one terminal
    ollama serve
    
-   # Pull the Llama model (in a separate terminal)
+   # In another terminal, pull the Llama model
    ollama pull llama2
    ```
 
-### Usage
+## 📖 Usage
+
+### Web Interface
 
 1. Start the Streamlit application:
    ```bash
-   streamlit run main.py
+   streamlit run app.py
+   ```
+   Or:
+   ```bash
+   python -m src.code_explainer.cli web
    ```
 
-2. Open your web browser and navigate to `http://localhost:8501`
+2. Open your web browser to `http://localhost:8501`
 
-3. Upload a Python file using the file uploader
+3. Upload a Python file and explore the analysis
 
-4. View the code analysis and click "Generate Non-Technical Report with Llama" to get an AI-powered explanation
+### Command Line Interface
 
-5. Download the analysis as a Word document for future reference
+Analyze a Python file:
+```bash
+python -m src.code_explainer.cli analyze path/to/your/file.py
+```
+
+Generate documentation:
+```bash
+python -m src.code_explainer.cli document path/to/your/file.py --output docs/
+```
 
 ## 🛠️ How It Works
 
-1. **Code Analysis**: The application parses the uploaded Python file and extracts:
+1. **Code Analysis**: The tool parses Python files to extract:
    - Function and class definitions
-   - Method signatures and arguments
-   - Docstrings and comments
-   - Return value indicators
+   - Method signatures with arguments and return types
+   - Docstrings and inline comments
+   - Import statements and module-level documentation
 
-2. **AI Explanation**: The extracted information is sent to the Llama model to generate a non-technical explanation of the code's functionality.
+2. **AI Integration**: The extracted information is processed by the Llama model to generate:
+   - Clear, non-technical explanations
+   - Usage examples
+   - Documentation in multiple formats
 
-3. **Interactive UI**: The web interface allows you to:
-   - Navigate through code elements with expandable sections
-   - View detailed information about each function/class
-   - Get AI-generated explanations in plain English
-   - Export the complete analysis as a Word document
+3. **Output Generation**: Results can be:
+   - Viewed in the web interface
+   - Exported as Word documents
+   - Generated automatically via GitHub Actions
 
-## 📦 Dependencies
+## 📦 Project Structure
 
-- `streamlit` - For the web interface
-- `ollama` - For interacting with the Llama model
-- `python-docx` - For generating Word documents
-- `ast` - For Python code parsing (standard library)
+```
+.
+├── src/
+│   ├── code_explainer/
+│   │   ├── __init__.py
+│   │   ├── cli.py          # Command line interface
+│   │   ├── code_analyzer.py # Core code analysis logic
+│   │   ├── document_generator.py # Document generation
+│   │   └── llm_integration.py # Llama model integration
+│   ├── action.py          # GitHub Action entry point
+│   └── analyzer.py        # Core analysis functionality
+├── .github/workflows/     # GitHub Actions workflows
+├── app.py                 # Streamlit web app
+├── main.py                # Legacy entry point
+├── requirements.txt       # Python dependencies
+└── setup.py               # Package configuration
+```
+
+## 🤖 GitHub Action
+
+This repository includes a GitHub Action that automatically generates documentation on push:
+
+1. Triggered on pushes to `main` branch
+2. Analyzes changed Python files
+3. Generates and commits documentation updates
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
-## 🤖 Automated Documentation with GitHub Actions
+## 🤝 Contributing
 
-This repository includes a GitHub Actions workflow that automatically generates documentation whenever you push code changes. Here's how it works:
-
-1. **Automatic Trigger**: The workflow runs on every push to the `main` branch that includes changes to Python files.
-
-2. **Documentation Generation**:
-   - The workflow checks out your code
-   - Sets up Python and installs dependencies
-   - Runs the documentation generator on all Python files
+Contributions are welcome! Please feel free to submit a Pull Request.
    - Saves the output as a Word document in the `docs` directory
 
 3. **Artifact Storage**: The generated documentation is available as a downloadable artifact in the GitHub Actions run.
