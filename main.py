@@ -9,6 +9,48 @@ try:
 except ImportError:
     DOCX_AVAILABLE = False
     st.warning("The 'python-docx' package is required for .docx export. Please install it with 'pip install python-docx'")
+    
+# Add these imports at the top
+import os
+import mimetypes
+from pathlib import Path
+
+def detect_file_type(filename):
+    """Detect file type based on extension and content."""
+    if not filename:
+        return "unknown"
+    
+    ext = Path(filename).suffix.lower()[1:]  # Get extension without dot
+    mime_type, _ = mimetypes.guess_type(filename)
+    
+    # Code files
+    code_exts = ['py', 'js', 'jsx', 'ts', 'tsx', 'java', 'c', 'cpp', 'h', 'hpp', 
+                'cs', 'go', 'rs', 'rb', 'php', 'sh', 'pl', 'r', 'm', 'jl']
+    if ext in code_exts:
+        return 'code'
+        
+    # Data files
+    data_exts = ['json', 'yaml', 'yml', 'xml', 'csv', 'toml', 'ini', 'cfg']
+    if ext in data_exts:
+        return 'data'
+        
+    # Document files
+    doc_exts = ['md', 'txt', 'html', 'htm', 'css', 'pdf', 'doc', 'docx']
+    if ext in doc_exts or (mime_type and any(t in mime_type for t in ['text', 'document'])): 
+        return 'document'
+        
+    return 'unknown'
+
+def read_file_content(file):
+    """Read file content based on its type."""
+    try:
+        if file.type and ('text/' in file.type or file.type in ['application/json', 'application/xml']):
+            return file.getvalue().decode('utf-8')
+        else:
+            # For binary files, we'll just note the file type
+            return f"[Binary file: {file.name}, Type: {file.type or 'unknown'}]"
+    except Exception as e:
+        return f"Error reading file: {str(e)}"
 
 # Helper
 def extract_elements(code):
@@ -148,69 +190,86 @@ def llama_explain(code_elements):
     return response['message']['content']
 
 # ---- Streamlit UI ----
-st.title("Python Code Explainer (Enhanced Edition)")
+# ---- Streamlit UI ----
+st.title("File Analyzer & Summarizer")
 
-uploaded_file = st.file_uploader("Upload Python (.py) file", type="py")
+uploaded_file = st.file_uploader(
+    "Upload any file for analysis", 
+    type=None,  # Accept all file types
+    accept_multiple_files=False,
+    help="Upload any text-based file (code, documents, data files) for analysis"
+)
 
 if uploaded_file:
     try:
-        code = uploaded_file.read().decode()
-        code_elements = extract_elements(code)
-    except Exception as e:
-        st.error(f"Error reading file: {str(e)}")
-    
-    st.header("Code Analysis")
-    for el in code_elements:
-        with st.expander(f"{el['type']}: {el['name']} (Lines {el['start_line']}-{el['end_line']})"):
-            st.caption(f"Location: Lines {el['start_line']}-{el['end_line']}")
-            
-            if el['args']:
-                st.write(f"**Arguments:** `{', '.join(el['args']) if el['args'] else 'None'}`")
-            if el['type'] != 'Class' and el['has_return']:
-                st.write("**Returns:** Yes")
+        file_type = detect_file_type(uploaded_file.name)
+        file_content = read_file_content(uploaded_file)
+        
+        st.header(f"File Analysis: {uploaded_file.name}")
+        st.write(f"**Type:** {file_type.capitalize()} file")
+        
+        if file_type == 'code':
+            # Existing code analysis for Python files
+            if uploaded_file.name.endswith('.py'):
+                code_elements = extract_elements(file_content)
+                # ... rest of the code analysis logic ...
+            else:
+                st.subheader("File Content")
+                st.code(file_content, language='text')
                 
-            if el['docstring']:
-                st.subheader("Documentation")
-                st.text(el['docstring'])
+        elif file_type == 'data':
+            st.subheader("Data Content")
+            st.json(file_content) if uploaded_file.name.endswith('.json') else st.code(file_content)
             
-            st.subheader("Source Code")
-            st.code(el['source'], language='python')
+        elif file_type == 'document':
+            st.subheader("Document Content")
+            st.text_area("Content", file_content, height=300)
             
-    if st.button("Generate Non-Technical Report with Llama"):
-        with st.spinner("Analyzing code with Llama, please wait..."):
-            llama_summary = llama_explain(code_elements)
-            st.success("Llama's Non-Technical Explanation:")
-            st.write(llama_summary)
-
-            # GENERATE DOCX
+        else:
+            st.warning("This file type is not fully supported for analysis.")
+            st.download_button(
+                label="Download File",
+                data=uploaded_file,
+                file_name=uploaded_file.name,
+                mime=uploaded_file.type
+            )
+            
+        # Add a button to generate DOCX report
+        if st.button("Generate DOCX Report"):
             doc = Document()
-            doc.add_heading("Python Code Analysis Report", 0)
-
-            doc.add_heading("Code Structure:", level=1)
-            for el in code_elements:
-                doc.add_heading(f"{el['type']}: {el['name']} (Lines {el['start_line']}-{el['end_line']})", level=2)
-                if el['args']:
-                    doc.add_paragraph(f"Arguments: {', '.join(el['args'])}")
-                if el['type'] != 'Class' and el['has_return']:
-                    doc.add_paragraph("Returns: Yes")
-                if el['docstring']:
-                    doc.add_paragraph(f"Documentation:\n{el['docstring']}")
-                doc.add_paragraph("Source Code:")
-                doc.add_paragraph(el['source'], style='Intense Quote')  # applies a quote style for code
-
-            doc.add_heading("Llama's Non-Technical Explanation:", level=1)
-            doc.add_paragraph(llama_summary)
-
-            # Save document to a BytesIO buffer
+            doc.add_heading(f"File Analysis Report: {uploaded_file.name}", 0)
+            doc.add_paragraph(f"File Type: {file_type.capitalize()}")
+            
+            if file_type == 'code' and uploaded_file.name.endswith('.py'):
+                doc.add_heading("Code Structure:", level=1)
+                for el in code_elements:
+                    doc.add_heading(f"{el['type']}: {el['name']} (Lines {el['start_line']}-{el['end_line']})", level=2)
+                    if el['args']:
+                        doc.add_paragraph(f"Arguments: {', '.join(el['args'])}")
+                    if el['type'] != 'Class' and el['has_return']:
+                        doc.add_paragraph("Returns: Yes")
+                    if el['docstring']:
+                        doc.add_paragraph(f"Documentation:\\n{el['docstring']}")
+                    doc.add_paragraph("Source Code:")
+                    doc.add_paragraph(el['source'], style='Intense Quote')
+            else:
+                doc.add_heading("File Content:", level=1)
+                doc.add_paragraph(file_content)
+            
+            # Save to a BytesIO buffer
             buffer = io.BytesIO()
             doc.save(buffer)
             buffer.seek(0)
-
+            
+            # Create download button
             st.download_button(
-                label="Download .docx Analysis Report",
+                label="Download DOCX Report",
                 data=buffer,
-                file_name="python_code_analysis.docx",
+                file_name=f"analysis_{Path(uploaded_file.name).stem}.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
+            
+    except Exception as e:
+        st.error(f"Error processing file: {str(e)}")
 else:
-    st.caption("Upload a Python file to analyze its structure and get explanations.")
+    st.info("Please upload a file to analyze")

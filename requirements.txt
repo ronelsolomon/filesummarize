@@ -2,6 +2,7 @@
 streamlit>=1.24.0
 ollama>=0.1.5
 python-docx>=0.8.11
+PyYAML>=6.0
 python-multipart>=0.0.6  # For file uploads in FastAPI
 fastapi>=0.104.0  # For API endpoints
 uvicorn>=0.24.0  # ASGI server

@@ -1,10 +1,13 @@
 """
-Command-line interface for Code Explainer.
+Command-line interface for Code Analyzer AI.
 """
 import argparse
+import json
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any
+
+from .analyzer import CodeAnalyzer
 
 def main(args: Optional[list] = None) -> int:
     """
