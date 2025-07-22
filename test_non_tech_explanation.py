@@ -5,8 +5,9 @@ import sys
 import os
 from pathlib import Path
 
-# Add the src directory to the path
-sys.path.insert(0, str(Path(__file__).parent))
+# Add the project root directory to the path
+project_root = Path(__file__).parent
+sys.path.insert(0, str(project_root))
 
 from src.code_explainer.document_generator import generate_non_tech_explanation
 

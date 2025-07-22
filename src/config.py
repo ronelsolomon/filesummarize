@@ -2,7 +2,8 @@
 import os
 from pathlib import Path
 from typing import Optional
-from pydantic import BaseSettings, HttpUrl, validator
+from pydantic_settings import BaseSettings
+from pydantic import HttpUrl, field_validator
 
 
 class Settings(BaseSettings):
